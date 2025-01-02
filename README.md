@@ -29,7 +29,11 @@ Ensure both the frontend and backend servers are running before using the applic
 
 Below is a demo video showcasing the application in action. Click on the video to watch it.
 
-![Project Demo](example.mp4)
+
+
+https://github.com/user-attachments/assets/9d5d4485-98ac-4911-8def-7eec630e7330
+
+
 
 ---
 
