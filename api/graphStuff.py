@@ -1,118 +1,104 @@
-import csv
 import json
-
-# Example usage
-input_csv = "output.csv"  # Replace with the path to your input CSV file
+import networkx as nx
 
 
-def getGraph(usernames):
-    output = {"links": {}}
+def getGraph(graph, namesToLookup):
+    # Store the weights so we can take the weighted value
+    totalWeights = {name: 0 for name in namesToLookup}
 
-    # usernames = {"julianarakoczy": 0, "jasminamilinkovic": 0, "julia-horner": 0}
-    listedNames = usernames.keys()
+    # Store the draft names
+    completedNames = {}
 
-    with open(input_csv) as csvfile:
-        reader = csv.reader(csvfile, delimiter=',')
+    # Store all the connected nodes with their weights
+    connectedNodes = []
 
-        # Skip header
-        next(reader)
+    # Go Through all The names
+    for i in namesToLookup:
 
-        for row in reader:
+        # perform BFS
+        names = dict(enumerate(nx.bfs_layers(graph, i)))[1]
 
-            # Sort users alphabetically so we can detect users that repost each others content (real friends)
-            sortedRow = sorted(row[0:2])
+        # For the names for each bfs for a given name to lookup
+        for n in names:
 
-            # Weight value
-            sortedRow.append(row[2])
+            # Sort them so we can handle mutual friends
+            s = sorted([i, n])
+            whichGoesFirst = s[0]
+            whichGoesLast = s[1]
 
-            # user 1, user 2, weight
-            a, b, c = str(sortedRow[0]), str(sortedRow[1]), int(sortedRow[2])
+            # The first 2 if statements are done if 2 inputted usernames both share the same "friends"
+            # This way we only store 1 edge and do not create duplicates.
+            # Example: Input UserA, UserB and they both share ABC, DEF
+            # ABC: USERA
+            # But ABC is also for UserB
+            # So We will hit the 2nd if statement and do
+            # USERB: ABC
+            # If we did not add this node yet
+            if whichGoesFirst not in completedNames:
+                completedNames[whichGoesFirst] = {"destination": whichGoesLast, "weight": graph[n][i]["weight"]}
 
-            # If a user reposted their own content
-            if a == b:
-                continue
+            # If the first part is already added then we can use the 2nd name, this is to handle making sure we get all the names and not always doing the first in the alphabet
+            elif whichGoesLast not in completedNames:
+                completedNames[whichGoesLast] = {"destination": whichGoesFirst, "weight": graph[n][i]["weight"]}
 
-            # Store the total weights
-            if a in listedNames and b in listedNames:
-                usernames[a] += c
-                usernames[b] += c
-
-
-            elif a in listedNames:
-                usernames[a] += c
-
-
-            elif b in listedNames:
-                usernames[b] += c
-
+            # This handles the actual mutual connection where 2 users are directly related
             else:
-                continue
+                completedNames[whichGoesFirst]["weight"] += graph[n][i]["weight"]
 
-            # If it already exists as an entry we can just add the weight value
-            if a + "-" + b in output["links"]:
-                # this implies a mutual friendship so we can amplify it
-                output["links"][a + "<->" + b]["weight"] += 2 * (c * c)
+            # Add the total weights so we can take a weighted value after
+            totalWeights[i] += graph[n][i]["weight"]
 
-            # Otherwise we can create a new entry
-            else:
-                output["links"][a + "<->" + b] = {"source": a, "target": b, "weight": c}
-
-    topLinks = []
-
-    for i in output["links"]:
-        a, b = i.split("<->")
-
-        # Store the total weights
-        if a in listedNames:
-            nameToLookup = a
-
-
-        elif b in listedNames:
-            nameToLookup = b
-
+    # Output the weighted weights for each name
+    for i in completedNames:
+        # Check what name we need the weight value for
+        if i in namesToLookup:
+            nameToUse = i
         else:
-            continue
+            nameToUse = completedNames[i]["destination"]
 
-        # Store the total weight for a user
-        totalWeightForUser = usernames[nameToLookup]
+        # Append the node
+        connectedNodes.append([i, completedNames[i]["destination"], (completedNames[i]["weight"] / totalWeights[nameToUse]) * 100])
 
-        # Store teh old weight for a link that is stored for that user
-        oldWeight = output["links"][i]["weight"]
+    # Get the top connections
+    topLinks = sorted(connectedNodes, key=lambda x: x[2], reverse=True)
 
-        # Calculate the new weight
-        newWeight = (oldWeight / totalWeightForUser) * 100.0
-        output["links"][i]["weight"] = newWeight
-
-        topLinks.append([newWeight, i])
-
-    # print(output)
-    # print(usernames)
-    topLinks = sorted(topLinks, key=lambda x: x[0], reverse=True)
+    counter = 0
+    toCountUntil = 25
+    UsersToRecommend = 10
 
     finalLinks = []
+    recommendedUsers = []
     finalNodes = {"nodes": {}}
 
-    recommendations = {}
+    # Pick 25 potential matches, but only 10 will be recommended
+    while counter < toCountUntil and counter < len(topLinks):
 
-    for i in topLinks[:min(len(topLinks), 25)]:
-        finalLinks.append(output["links"][i[1]])
+        areMutual = False
 
-        # Store the colour for each node
-        finalNodes["nodes"][output["links"][i[1]]["source"]] = "#3a0ca3"
-        finalNodes["nodes"][output["links"][i[1]]["target"]] = "#3a0ca3"
+        # Prevent adding matches that are connected to each other
+        if topLinks[counter][0] in namesToLookup and topLinks[counter][1] in namesToLookup:
+            toCountUntil += 1
+            areMutual = True
 
-    for i in topLinks[:min(len(topLinks), 15)]:
-        # Store the colour for each node
-        finalNodes["nodes"][output["links"][i[1]]["source"]] = "#7209b7"
-        finalNodes["nodes"][output["links"][i[1]]["target"]] = "#7209b7"
+        finalLinks.append(
+            {"source": topLinks[counter][0], "target": topLinks[counter][1], "weight": topLinks[counter][2]})
+        finalNodes["nodes"][topLinks[counter][0]] = "#3a0ca3"
+        finalNodes["nodes"][topLinks[counter][1]] = "#3a0ca3"
 
-        # Store the recommendations
-        recommendations[output["links"][i[1]]["source"]] = 0
-        recommendations[output["links"][i[1]]["target"]] = 0
+        # Append only top n amount of connections and also make sure some of those friend sugestions are not existing friends
+        if len(recommendedUsers) < UsersToRecommend and not areMutual:
+            if topLinks[counter][0] not in namesToLookup:
+                recommendedUsers.append(topLinks[counter][0])
+                finalNodes["nodes"][topLinks[counter][0]] = "#7209b7"
 
-    for i in listedNames:
+            else:
+                recommendedUsers.append(topLinks[counter][1])
+                finalNodes["nodes"][topLinks[counter][1]] = "#7209b7"
+
+        counter += 1
+
+    for i in namesToLookup:
         finalNodes["nodes"][i] = "#f72585"
-        recommendations.pop(i)
 
     final = {'graph': {
 
@@ -125,10 +111,9 @@ def getGraph(usernames):
 
     },
 
-        'recommended_users': list(recommendations.keys())}
+        'recommended_users': recommendedUsers}
 
     return json.dumps(final)
-
 
 """
 go through first column to find inputted names

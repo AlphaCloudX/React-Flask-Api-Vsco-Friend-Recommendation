@@ -12,11 +12,38 @@ import re
 
 app = Flask(__name__)
 
-# Load the usernames into a list that can be used for recommending
-usernames = []
-with open("unique_names.txt", "r") as f:
-    for line in f:
-        usernames.append(line.strip())
+# Cache for runtime so we only need to load files once
+
+import networkx as nx
+import csv
+
+# Create a NetworkX graph
+graph = nx.Graph()
+
+# Load the CSV and populate the graph
+with open("output.csv") as csvfile:
+    reader = csv.reader(csvfile, delimiter=',')
+
+    # Skip header
+    next(reader)
+
+    for row in reader:
+
+        # Sort users alphabetically for consistent edge representation
+        a, b = sorted(row[0:2])
+        c = int(row[2])  # Weight of the connection
+
+        # Skip people reposting own content
+        if a == b:
+            continue
+
+        if graph.has_edge(a, b):
+            graph[a][b]["weight"] += c
+        else:
+            graph.add_edge(a, b, weight=c)
+
+# Cache the usernames into a list that can be used for recommending
+usernames = list(graph.nodes)
 
 # Enable CORS with all origins
 CORS(app, resources={r"/*": {"origins": "*"}})
@@ -66,7 +93,7 @@ def search():
 
     usernamesNeeded = {user: 0 for user in names}
 
-    graphData = getGraph(usernamesNeeded)
+    graphData = getGraph(graph, usernamesNeeded)
 
     return jsonify(graphData)
 
@@ -100,13 +127,10 @@ def random_data():
     amountOfAccounts = random.randint(1, 5)
 
     for i in range(amountOfAccounts):
-        nums.append(random.randint(0, 25913))  # Generate random indices within range
-
-    with open("unique_names.txt") as f:
-        lines = f.readlines()  # Read all lines from the file
+        nums.append(random.randint(0, 25912))  # Generate random indices within range
 
     # Select random names based on the generated indices
-    names = [lines[num].strip() for num in nums]
+    names = [usernames[num] for num in nums]
 
     emit('random-names-to-added', names, broadcast=False)  # Send the selected names to the client
 

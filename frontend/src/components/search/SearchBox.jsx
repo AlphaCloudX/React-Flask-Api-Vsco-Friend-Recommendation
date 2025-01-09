@@ -128,9 +128,6 @@ function generateRandom() {
  * @param setNames
  */
 function clearAll(setUserInput, setNames) {
-
-    console.log("PRESSED")
-
     setUserInput("");
     setNames([]);
 

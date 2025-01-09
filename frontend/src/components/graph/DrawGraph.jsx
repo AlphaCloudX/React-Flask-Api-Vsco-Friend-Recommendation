@@ -29,11 +29,11 @@ function DrawGraph(names) {
                 {recommendedFriends.length > 0 &&
                     <h2 className="text-2xl text-center font-bold  mt-6">Visualize Friend Network:</h2>}
 
+                {displayRecommendedUsers(recommendedFriends)}
+
                 {/* Graph container */}
                 <div id="graph" className="mt-2">
                 </div>
-
-                {displayRecommendedUsers(recommendedFriends)}
 
 
             </div>
@@ -95,6 +95,7 @@ async function getNodes(names, setRecommendedFriends) {
 
         data = JSON.parse(data);
 
+
         // Use the received data to update the graph
         // .graph.nodes
         // .graph.links
@@ -104,7 +105,7 @@ async function getNodes(names, setRecommendedFriends) {
         // .recommended_users
         setRecommendedFriends(data["recommended_users"]);
 
-        scrollToBottom();
+        // scrollToBottom();
 
     } catch (error) {
         console.error("Error fetching nodes:", error);
@@ -119,7 +120,7 @@ function drawGraph(nodes, links) {
     graphContainer.selectAll('*').remove(); // Clear previous graph
 
     const width = window.innerWidth;
-    const height = nodes.length * 55; // Calculate height based on nodes count
+    const height = nodes.length * 50; // Calculate height based on nodes count
 
     graphContainer.style('height', `${height}px`);
 
@@ -133,7 +134,7 @@ function drawGraph(nodes, links) {
     // Set up simulation
     const simulation = forceSimulation(nodes)
         .force('link', forceLink(links).id((d) => d.id).distance(100))
-        .force('charge', forceManyBody().strength(-100))
+        .force('charge', forceManyBody().strength(-50))
         .force('center', forceCenter(width / 2, height / 2));
 
     // Draw links (edges)
@@ -144,7 +145,7 @@ function drawGraph(nodes, links) {
         .enter()
         .append('line')
         .attr('class', 'link')
-        .attr('stroke-width', (d) => Math.min(d.weight, 5)) // (d) => Math.min(1, d.weight*10) Scale weight for link thickness
+        .attr('stroke-width', (d) => Math.min(d.weight / 10, 15)) // (d) => Math.min(1, d.weight*10) Scale weight for link thickness
         .attr('stroke', '#ccc');
 
     // Draw nodes (vertices)
